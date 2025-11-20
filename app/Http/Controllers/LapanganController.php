@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Lapangan;
 use App\Http\Requests\StoreLapanganRequest;
 use App\Http\Requests\UpdateLapanganRequest;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class LapanganController extends Controller
@@ -16,7 +17,7 @@ class LapanganController extends Controller
     {
         $daftarLapangan = Lapangan::all();
 
-        return Inertia::render('data-lapangan/index', [
+        return Inertia::render('lapangan/index', [
             // Data dikirim ke React sebagai props
             'daftarLapangan' => $daftarLapangan,
         ]);
@@ -27,7 +28,7 @@ class LapanganController extends Controller
      */
     public function create()
     {
-        return Inertia::render('data-lapangan/create');
+        return Inertia::render('lapangan/create');
     }
 
     /**
@@ -41,10 +42,12 @@ class LapanganController extends Controller
         
         // Simpan Gambar (Jika ada)
         if ($request->hasFile('gambar')) {
-            // Simpan gambar ke storage dan dapatkan path-nya
-            $path = $request->file('gambar')->store('public/lapangan_images');
+            // Simpan gambar ke subfolder 'lapangan_images' menggunakan DISK 'public'.
+            // Path yang dikembalikan akan berbentuk: lapangan_images/namafileunik.jpg
+            $path = $request->file('gambar')->store('lapangan_images', 'public');
+            
             // Simpan path gambar ke dalam array data yang akan disimpan
-            $validated['gambar'] = str_replace('public/', '', $path); 
+            $validated['gambar'] = $path; 
         }
         
         // Simpan data ke Database
@@ -60,7 +63,7 @@ class LapanganController extends Controller
      */
     public function show(Lapangan $lapangan)
     {
-        return Inertia::render('data-lapangan/show', [ 
+        return Inertia::render('lapangan/show', [ 
             // Data Lapangan dikirim sebagai 'lapangan'
             'lapangan' => $lapangan, 
         ]);
@@ -71,7 +74,7 @@ class LapanganController extends Controller
      */
     public function edit(Lapangan $lapangan)
     {
-        return Inertia::render('data-lapangan/edit', [ 
+        return Inertia::render('lapangan/edit', [ 
             // Data Lapangan dikirim sebagai 'lapangan'
             'lapangan' => $lapangan, 
         ]);
@@ -82,7 +85,34 @@ class LapanganController extends Controller
      */
     public function update(UpdateLapanganRequest $request, Lapangan $lapangan)
     {
-        //
+        // Validasi sudah dilakukan oleh UpdateLapanganRequest.
+        // Dapatkan data yang sudah divalidasi
+        $validated = $request->validated();
+
+        
+        // Simpan Gambar (Jika ada)
+        if ($request->hasFile('gambar')) {
+            // Menghapus jika ada gambar lama 
+            if ($lapangan->gambar) { 
+                Storage::disk('public')->delete($lapangan->gambar);
+            }
+
+            // Simpan gambar ke subfolder 'lapangan_images' menggunakan DISK 'public'.
+            // Path yang dikembalikan akan berbentuk: lapangan_images/namafileunik.jpg
+            $path = $request->file('gambar')->store('lapangan_images', 'public');
+            
+            // Simpan path gambar ke dalam array data yang akan disimpan
+            $validated['gambar'] = $path; 
+        } else {
+            unset($validated['gambar']);
+        }
+                
+        // Simpan data ke Database
+        $lapangan->update($validated);
+
+        // Redirect ke halaman daftar (index)
+        return redirect()->route('lapangan.index')
+            ->with('success', 'Lapangan berhasil diperbarui!');
     }
 
     /**

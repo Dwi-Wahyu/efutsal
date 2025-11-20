@@ -14,10 +14,10 @@ import {
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { edit, index, store } from '@/routes/lapangan';
+import { index, update } from '@/routes/lapangan'; // Hanya perlu update dan index
 import { BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
-import { FormEvent } from 'react';
+import { FormEvent, useMemo } from 'react'; // Import useMemo untuk pratinjau
 import { Lapangan } from '.';
 
 export default function EditLapangan({ lapangan }: { lapangan: Lapangan }) {
@@ -28,28 +28,55 @@ export default function EditLapangan({ lapangan }: { lapangan: Lapangan }) {
         },
         {
             title: 'Edit Lapangan',
-            href: edit(lapangan).url,
+            // Gunakan route update untuk mendapatkan URL edit yang benar
+            href: update(lapangan).url,
         },
     ];
 
+    // Inisialisasi useForm
     const { data, setData, post, processing, errors } = useForm({
+        // Gunakan PUT method untuk update (Inertia akan mengubahnya menjadi POST
+        // dengan field tersembunyi _method=PUT untuk file upload)
+        _method: 'put',
         nama: lapangan.nama,
-        gambar: lapangan.gambar,
+
+        // PENTING: Gambar harus diinisialisasi sebagai null atau File | string.
+        // String gambar lama HANYA berfungsi sebagai placeholder/penanda gambar.
+        // Ketika file baru diupload, properti ini akan diganti dengan File object.
+        // Jika tidak ada upload, inertia akan mengabaikan properti ini.
+        gambar: null as File | null, // Inisialisasi sebagai File object yang baru diupload
         kapasitas: lapangan.kapasitas,
         biaya_per_jam: lapangan.biaya_per_jam,
     });
 
+    // Gunakan useMemo untuk membuat URL pratinjau gambar yang baru diupload
+    const newImageUrl = useMemo(() => {
+        if (data.gambar instanceof File) {
+            return URL.createObjectURL(data.gambar);
+        }
+        return null;
+    }, [data.gambar]);
+
     const submit = (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
-        // Panggil Inertia post. Inertia otomatis menangani File Upload (multipart/form-data)
-        post(store().url, {
+        // PENTING: Panggil Inertia post/put dan arahkan ke route update()
+        post(update(lapangan).url, {
             onSuccess: () => {
-                // Redirect akan terjadi jika Controller Laravel mengirimkan redirect()->route()
-                console.log('Submit berhasil, menunggu redirect...');
+                console.log('Update berhasil.');
             },
+            // Force file upload handling
+            forceFormData: true,
             preserveScroll: true,
         });
+    };
+
+    // Helper untuk menangani perubahan pada input teks/angka (Menghindari string kosong pada number)
+    const handleNumberChange = (
+        key: 'kapasitas' | 'biaya_per_jam',
+        value: string,
+    ) => {
+        setData(key, value === '' ? 0 : parseInt(value));
     };
 
     return (
@@ -58,6 +85,7 @@ export default function EditLapangan({ lapangan }: { lapangan: Lapangan }) {
 
             <Card className="m-4 mx-auto w-xl">
                 <CardContent>
+                    {/* Hapus atribut method dan action dari form HTML jika menggunakan Inertia */}
                     <form onSubmit={submit}>
                         <FieldSet>
                             <FieldLegend>Edit Data Lapangan</FieldLegend>
@@ -68,7 +96,7 @@ export default function EditLapangan({ lapangan }: { lapangan: Lapangan }) {
                             <FieldSeparator />
 
                             <FieldGroup>
-                                {/* INPUT NAMA LAPANGAN */}
+                                {/* INPUT NAMA (TIDAK BERUBAH) */}
                                 <Field orientation="vertical">
                                     <FieldContent>
                                         <FieldLabel htmlFor="nama">
@@ -89,18 +117,43 @@ export default function EditLapangan({ lapangan }: { lapangan: Lapangan }) {
                                     )}
                                 </Field>
 
-                                {/* <FieldSeparator /> */}
-
-                                {/* INPUT GAMBAR */}
-                                {/* <Field orientation="responsive">
+                                {/* INPUT GAMBAR (PERBAIKAN) */}
+                                <Field orientation="vertical">
                                     <FieldContent>
                                         <FieldLabel htmlFor="gambar">
                                             Gambar Lapangan
                                         </FieldLabel>
                                         <FieldDescription>
-                                            Unggah foto lapangan (Maks. 2MB)
+                                            Unggah foto lapangan baru untuk
+                                            mengganti gambar lama (Maks. 2MB)
                                         </FieldDescription>
                                     </FieldContent>
+
+                                    {/* 1. TAMPILKAN GAMBAR LAMA/BARU */}
+                                    {(lapangan.gambar || newImageUrl) && (
+                                        <div className="mb-4">
+                                            <p className="mb-1 text-sm font-medium">
+                                                Gambar Saat Ini:
+                                            </p>
+                                            <img
+                                                // Jika ada gambar baru di form, tampilkan pratinjau
+                                                src={
+                                                    newImageUrl ||
+                                                    '/storage/' +
+                                                        lapangan.gambar
+                                                }
+                                                alt="Gambar Lapangan Saat Ini"
+                                                className="h-32 w-48 rounded border border-gray-200 object-cover shadow-lg"
+                                            />
+                                            {newImageUrl && (
+                                                <p className="mt-1 text-xs text-green-600">
+                                                    (Pratinjau Gambar Baru)
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* 2. INPUT FILE UNTUK UPLOAD */}
                                     <Input
                                         id="gambar"
                                         type="file"
@@ -114,12 +167,23 @@ export default function EditLapangan({ lapangan }: { lapangan: Lapangan }) {
                                             )
                                         }
                                     />
+
+                                    {/* 3. TAMPILKAN ERROR */}
                                     {errors.gambar && (
                                         <FieldError>{errors.gambar}</FieldError>
                                     )}
-                                </Field> */}
 
-                                {/* INPUT KAPASITAS */}
+                                    {/* 4. TOMBOL HAPUS GAMBAR (OPSIONAL) */}
+                                    {lapangan.gambar && !newImageUrl && (
+                                        <FieldDescription className="mt-2 text-red-500">
+                                            Catatan: Jika Anda menyimpan tanpa
+                                            mengunggah file baru, gambar yang
+                                            ada akan dipertahankan.
+                                        </FieldDescription>
+                                    )}
+                                </Field>
+
+                                {/* INPUT KAPASITAS (TIDAK BERUBAH) */}
                                 <Field orientation="vertical">
                                     <FieldContent>
                                         <FieldLabel htmlFor="kapasitas">
@@ -130,17 +194,12 @@ export default function EditLapangan({ lapangan }: { lapangan: Lapangan }) {
                                         id="kapasitas"
                                         type="number"
                                         placeholder="Contoh: 20"
-                                        // Gunakan helper untuk menangani null/string kosong
                                         value={data.kapasitas ?? ''}
                                         onChange={(e) => {
-                                            const parsed = parseInt(
+                                            handleNumberChange(
+                                                'kapasitas',
                                                 e.target.value,
                                             );
-                                            if (!isNaN(parsed)) {
-                                                setData('kapasitas', parsed);
-                                            } else {
-                                                setData('kapasitas', 0);
-                                            }
                                         }}
                                         required
                                     />
@@ -151,7 +210,7 @@ export default function EditLapangan({ lapangan }: { lapangan: Lapangan }) {
                                     )}
                                 </Field>
 
-                                {/* INPUT BIAYA PER JAM */}
+                                {/* INPUT BIAYA PER JAM (TIDAK BERUBAH) */}
                                 <Field orientation="vertical">
                                     <FieldContent>
                                         <FieldLabel htmlFor="biaya_per_jam">
@@ -164,17 +223,10 @@ export default function EditLapangan({ lapangan }: { lapangan: Lapangan }) {
                                         placeholder="Contoh: 150000"
                                         value={data.biaya_per_jam ?? ''}
                                         onChange={(e) => {
-                                            const parsed = parseInt(
+                                            handleNumberChange(
+                                                'biaya_per_jam',
                                                 e.target.value,
                                             );
-                                            if (!isNaN(parsed)) {
-                                                setData(
-                                                    'biaya_per_jam',
-                                                    parsed,
-                                                );
-                                            } else {
-                                                setData('biaya_per_jam', 0);
-                                            }
                                         }}
                                         required
                                     />
@@ -185,7 +237,6 @@ export default function EditLapangan({ lapangan }: { lapangan: Lapangan }) {
                                     )}
                                 </Field>
 
-                                {/* TOMBOL SUBMIT DAN CANCEL */}
                                 <Field
                                     orientation="responsive"
                                     className="flex justify-end"

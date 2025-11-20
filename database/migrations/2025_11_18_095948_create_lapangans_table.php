@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::create('lapangan', function (Blueprint $table) {
             $table->id();
 
-            // Kolom yang Anda minta
             $table->string('nama', 100);
             $table->string('gambar')->nullable(); // Boleh kosong jika gambar opsional
             $table->unsignedSmallInteger('kapasitas'); // Kapasitas (misal: 10-100 orang)

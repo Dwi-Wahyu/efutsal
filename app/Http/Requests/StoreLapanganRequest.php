@@ -11,7 +11,12 @@ class StoreLapanganRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return false;
+
+        if (!$this->user()) {
+            return false;
+        }
+
+        return $this->user()->is_admin;
     }
 
     /**
@@ -22,7 +27,14 @@ class StoreLapanganRequest extends FormRequest
     public function rules(): array
     {
         return [
-            //
+            // --- ATURAN VALIDASI UNTUK SEMUA KOLOM WAJIB ---
+            'nama' => ['required', 'string', 'max:100'],
+            'kapasitas' => ['required', 'integer', 'min:1'],
+            'biaya_per_jam' => ['required', 'integer', 'min:10000'],
+            
+            // Untuk file upload, gunakan 'file' dan tentukan format/ukuran
+            'gambar' => ['required', 'file', 'mimes:jpeg,png,jpg', 'max:4048'], // Maks 4MB       
+            // ------------------------------------------------
         ];
     }
 }

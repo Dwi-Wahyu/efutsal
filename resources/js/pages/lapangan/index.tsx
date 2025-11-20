@@ -1,12 +1,10 @@
+import { index } from '@/actions/App/Http/Controllers/LapanganController';
+import LapanganCard from '@/components/lapangan-card';
 import NavigationButton from '@/components/navigation-button';
 import { PageTitle } from '@/components/page-title';
-import { Card, CardContent } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import formatPrice from '@/lib/format-price';
-import { create, index } from '@/routes/lapangan';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
-import { Users } from 'lucide-react';
+import { Head } from '@inertiajs/react';
 
 // Tipe data untuk Lapangan (gunakan tipe yang sesuai dengan data Anda)
 export type Lapangan = {
@@ -40,7 +38,10 @@ export default function DaftarLapangan({
                 <div className="flex items-center justify-between">
                     <PageTitle>Daftar Lapangan</PageTitle>
 
-                    <NavigationButton type="button" href={create().url}>
+                    <NavigationButton
+                        type="button"
+                        href={'/data-lapangan/input'}
+                    >
                         Input Lapangan
                     </NavigationButton>
                 </div>
@@ -51,32 +52,10 @@ export default function DaftarLapangan({
                         <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             {/* Lakukan mapping (looping) pada array daftarLapangan */}
                             {daftarLapangan.map((lapangan) => (
-                                <Link
-                                    href={'/data-lapangan/' + lapangan.id}
+                                <LapanganCard
+                                    lapangan={lapangan}
                                     key={lapangan.id}
-                                    className="hover:shadow-lg"
-                                >
-                                    <Card key={lapangan.id}>
-                                        <CardContent>
-                                            <div className="flex items-center justify-between gap-2">
-                                                <h1 className="font-semibold">
-                                                    {lapangan.nama}
-                                                </h1>
-                                                <div className="flex items-center gap-1.5 text-muted-foreground">
-                                                    <Users className="h-4 w-4" />
-                                                    {lapangan.kapasitas}
-                                                </div>
-                                            </div>
-                                            <p className="">
-                                                Rp
-                                                {formatPrice(
-                                                    lapangan.biaya_per_jam,
-                                                )}{' '}
-                                                / Jam
-                                            </p>
-                                        </CardContent>
-                                    </Card>
-                                </Link>
+                                />
                             ))}
                         </ul>
                     ) : (

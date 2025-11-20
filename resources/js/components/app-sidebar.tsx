@@ -8,13 +8,14 @@ import {
     SidebarMenu,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { dashboard, pengajuanReservasi } from '@/routes';
+import { dashboard, home, pengajuanReservasi } from '@/routes';
 import { index } from '@/routes/lapangan';
 import { type NavItem } from '@/types';
-import { LayoutGrid, Mails, Volleyball } from 'lucide-react';
+import { usePage } from '@inertiajs/react';
+import { Home, LayoutGrid, Mails, Volleyball } from 'lucide-react';
 import AppLogo from './app-logo';
 
-const mainNavItems: NavItem[] = [
+const adminNavItems: NavItem[] = [
     {
         title: 'Dashboard',
         href: dashboard(),
@@ -32,7 +33,36 @@ const mainNavItems: NavItem[] = [
     },
 ];
 
+const userNavItems: NavItem[] = [
+    {
+        title: 'Home',
+        href: home(),
+        icon: Home,
+    },
+    {
+        title: 'Pengajuan Reservasi',
+        href: pengajuanReservasi(),
+        icon: Mails,
+    },
+];
+
 export function AppSidebar() {
+    const { auth } = usePage().props;
+
+    if (!auth.user) {
+        return (
+            <Sidebar collapsible="icon" variant="inset">
+                <SidebarHeader>
+                    <SidebarMenu>
+                        <SidebarMenuItem className="flex items-center gap-2">
+                            <AppLogo />
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarHeader>
+            </Sidebar>
+        );
+    }
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
@@ -44,7 +74,9 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
+                <NavMain
+                    items={auth.user.is_admin ? adminNavItems : userNavItems}
+                />
             </SidebarContent>
 
             <SidebarFooter>
