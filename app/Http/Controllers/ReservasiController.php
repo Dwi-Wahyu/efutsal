@@ -28,8 +28,8 @@ class ReservasiController extends Controller
 
     public function indexAdmin()
     {
-        return Inertia::render('pengajuan-reservasi/index', [
-            'reservasi' => Reservasi::with(['lapangan', 'user'])->latest()->paginate(20)
+        return Inertia::render('reservasi/index-admin', [
+            'daftarReservasi' => Reservasi::with(['lapangan', 'user'])->latest()->paginate(20)
         ]);
     }
 
