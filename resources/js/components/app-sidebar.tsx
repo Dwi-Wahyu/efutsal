@@ -8,7 +8,12 @@ import {
     SidebarMenu,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { dashboard, home, pengajuanReservasi } from '@/routes';
+import {
+    admin_reservasi_index,
+    dashboard,
+    home,
+    pengajuanReservasi,
+} from '@/routes';
 import { index } from '@/routes/lapangan';
 
 import { type NavItem } from '@/types';
@@ -29,7 +34,7 @@ const adminNavItems: NavItem[] = [
     },
     {
         title: 'Pengajuan Reservasi',
-        href: pengajuanReservasi(),
+        href: admin_reservasi_index(),
         icon: Mails,
     },
 ];

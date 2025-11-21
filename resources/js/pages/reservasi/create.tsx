@@ -23,7 +23,7 @@ export default function ReservasiLapangan() {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Reservasi Lapangan" />
 
-            <Card className="m-4 mx-auto w-xl">
+            <Card className="m-4mx-auto w-xl">
                 <CardContent>
                     <h1 className="text-2xl font-semibold">
                         Formulir Reservasi

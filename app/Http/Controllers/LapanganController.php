@@ -120,6 +120,17 @@ class LapanganController extends Controller
      */
     public function destroy(Lapangan $lapangan)
     {
-        //
+        // 1. Cek apakah ada file gambar terkait, lalu hapus dari storage
+        if ($lapangan->gambar) {
+            // Asumsi Anda menyimpan gambar di disk 'public'
+            Storage::disk('public')->delete($lapangan->gambar);
+        }
+
+        // 2. Hapus data record dari database
+        $lapangan->delete();
+
+        // 3. Redirect kembali ke halaman index dengan pesan sukses
+        return redirect()->route('lapangan.index')
+            ->with('success', 'Data lapangan dan gambar berhasil dihapus.');
     }
 }

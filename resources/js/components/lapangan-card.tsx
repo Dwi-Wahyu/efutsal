@@ -10,7 +10,7 @@ export default function LapanganCard({ lapangan }: { lapangan: Lapangan }) {
         <Link
             href={show(lapangan)}
             key={lapangan.id}
-            className="hover:shadow-lg"
+            className="rounded-lg hover:shadow-lg"
         >
             <Card key={lapangan.id}>
                 <CardContent>

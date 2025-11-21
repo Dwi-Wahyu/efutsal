@@ -8,7 +8,7 @@ use App\Http\Requests\StoreReservasiRequest;
 use App\Http\Requests\UpdateReservasiRequest;
 use App\Models\Lapangan;
 use Carbon\Carbon;
-use Illuminate\Http\RedirectResponse;
+use App\Services\WhatsAppService;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
@@ -22,14 +22,38 @@ class ReservasiController extends Controller
         return Inertia::render('reservasi/index');
     }
 
-    public function indexUser()
-    {
-    }
-
     public function indexAdmin()
     {
-        return Inertia::render('reservasi/index-admin', [
-            'daftarReservasi' => Reservasi::with(['lapangan', 'user'])->latest()->paginate(20)
+        // 1. Ambil data dengan relasi 'user' dan 'lapangan'
+        // 2. Gunakan get() untuk mengambil koleksi
+        // 3. Gunakan map() untuk memformat ulang data (cleaning data)
+        $daftarReservasi = Reservasi::with(['user', 'lapangan'])
+            ->latest() // Mengurutkan dari yang terbaru
+            ->get()
+            ->map(function ($reservasi) {
+                return [
+                    'id' => $reservasi->id,
+                    
+                    // Mengambil data dari Relasi
+                    'user_name' => $reservasi->user->name ?? 'User Terhapus',
+                    'lapangan_nama' => $reservasi->lapangan->nama ?? 'Lapangan Terhapus',
+                    
+                    // FORMAT TANGGAL & WAKTU (Carbon)
+                    // Karena sudah di-cast di Model, kita bisa langsung pakai method format()
+                    'tanggal_main' => $reservasi->date->format('d M Y'), // Contoh: 21 Nov 2025
+                    'jam_mulai'    => $reservasi->start_time->format('H:i'), // Contoh: 14:00
+                    'jam_selesai'  => $reservasi->end_time->format('H:i'),   // Contoh: 15:00
+                    
+                    // Format Rupiah sederhana
+                    'total_harga'  => 'Rp ' . number_format($reservasi->total_price, 0, ',', '.'),
+                    
+                    'status' => $reservasi->status, // Mengirim object Enum
+                    'durasi' => $reservasi->duration_hours . ' Jam',
+                ];
+            });
+
+        return Inertia::render('reservasi/admin/index', [
+            'daftarReservasi' => $daftarReservasi
         ]);
     }
 
@@ -64,7 +88,7 @@ class ReservasiController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function storeFromLapangan(StoreReservasiRequest $request, Lapangan $lapangan)
+    public function storeFromLapangan(StoreReservasiRequest $request, Lapangan $lapangan, WhatsAppService $waService)
     {
         // Ambil data yang sudah divalidasi
         $date       = $request->validated('date');        // string: "2025-08-15"
@@ -91,9 +115,20 @@ class ReservasiController extends Controller
             'status'          => ReservasiStatus::Pending,
         ]);
 
+        $pesan = "Reservasi Baru Masuk";
+
+        $waService->sendMessage('6289643144013', $pesan);
+
         return redirect()
             ->route('home')
             ->with('success', 'Reservasi berhasil diajukan! Silakan lakukan pembayaran.');
+    }
+
+    public function formatNomor($nomor) {
+        if (substr($nomor, 0, 1) == '0') {
+            return '62' . substr($nomor, 1);
+        }
+        return $nomor;
     }
     
     /**
@@ -101,7 +136,10 @@ class ReservasiController extends Controller
      */
     public function show(Reservasi $reservasi)
     {
-        //
+        return Inertia::render('reservasi/show', [ 
+            // Data Lapangan dikirim sebagai 'reservasi'
+            'reservasi' => $reservasi, 
+        ]);
     }
 
     /**

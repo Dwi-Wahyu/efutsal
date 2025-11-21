@@ -3,6 +3,7 @@ import LapanganCard from '@/components/lapangan-card';
 import NavigationButton from '@/components/navigation-button';
 import { PageTitle } from '@/components/page-title';
 import AppLayout from '@/layouts/app-layout';
+import { create } from '@/routes/lapangan';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
 
@@ -38,10 +39,7 @@ export default function DaftarLapangan({
                 <div className="flex items-center justify-between">
                     <PageTitle>Daftar Lapangan</PageTitle>
 
-                    <NavigationButton
-                        type="button"
-                        href={'/data-lapangan/input'}
-                    >
+                    <NavigationButton type="button" href={create().url}>
                         Input Lapangan
                     </NavigationButton>
                 </div>

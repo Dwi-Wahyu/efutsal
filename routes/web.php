@@ -24,8 +24,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::resource('reservasi', ReservasiController::class);
 
-    Route::get('pengajuan-reservasi',[ReservasiController::class, 'reservasiIndexAdmin'])
-     ->name('reservasi.index-admin');
+    Route::prefix('admin/reservasi')->name('admin_reservasi_')->group(function () {
+        Route::get('/', [ReservasiController::class, 'indexAdmin'])->name('index'); 
+    });
 
     Route::get('lapangan/{lapangan}/reservasi',[ReservasiController::class, 'createFromLapangan'])
      ->name('reservasi.create-from-lapangan');
