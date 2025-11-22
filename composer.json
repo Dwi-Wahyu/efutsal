@@ -93,6 +93,14 @@
             "php-http/discovery": true
         }
     },
+    "autoload": {
+    "psr-4": {
+        "App\\": "app/",
+        "App\\Helpers\\": "app/Helpers/"
+    },
+    ...
+},
+
     "minimum-stability": "stable",
     "prefer-stable": true
 }

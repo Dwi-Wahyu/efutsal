@@ -155,8 +155,6 @@ class ReservasiController extends Controller
         ]);
 
         // Logika WhatsApp
-        $approveUrl = route('admin.reservasi.approve', $reservasi->id);
-        $rejectUrl  = route('admin.reservasi.reject', $reservasi->id);
         $nomorAdmin = '6289643144013'; 
 
         $text  = "📢 *ORDER BARU MASUK #{$reservasi->id}*\n";
@@ -166,14 +164,7 @@ class ReservasiController extends Controller
         $text .= "📅 *Main:* " . $start->translatedFormat('d F Y') . "\n";
         $text .= "⏰ *Jam:* " . $start->format('H:i') . " - " . $end->format('H:i') . "\n";
         $text .= "💰 *Total:* Rp " . number_format($totalPrice, 0, ',', '.') . "\n";
-        $text .= "──────────────────\n\n";
-        
-        $text .= "Admin, silakan klik link di bawah untuk konfirmasi:\n\n";
-        $text .= "✅  *TERIMA PESANAN*\n";
-        $text .= $approveUrl . "\n\n";
-        $text .= "❌  *TOLAK PESANAN*\n";
-        $text .= $rejectUrl . "\n\n";
-        $text .= "⚠️ _Link ini otomatis mengubah status di sistem._";
+        $text .= "──────────────────\n\n";  
 
         $whatsappUrl = "https://wa.me/{$nomorAdmin}?text=" . urlencode($text);
 
@@ -234,22 +225,16 @@ class ReservasiController extends Controller
         ]);
 
         // Logika WhatsApp (Sama seperti sebelumnya)
-        $approveUrl = route('admin.reservasi.approve', $reservasi->id);
-        $rejectUrl  = route('admin.reservasi.reject', $reservasi->id);
         $nomorAdmin = '6289643144013'; 
 
-        $text  = "📢 *ORDER BARU MASUK #{$reservasi->id}*\n";
+        $text  = "*ORDER BARU MASUK #{$reservasi->id}*\n";
         $text .= "──────────────────\n";
-        $text .= "👤 *Pemesan:* " . $user->name . "\n";
-        $text .= "🏟 *Lapangan:* " . $lapangan->nama . "\n";
-        $text .= "📅 *Main:* " . $start->translatedFormat('d F Y') . "\n";
-        $text .= "⏰ *Jam:* " . $start->format('H:i') . " - " . $end->format('H:i') . "\n";
-        $text .= "💰 *Total:* Rp " . number_format($totalPrice, 0, ',', '.') . "\n";
+        $text .= "*Pemesan:* " . $user->name . "\n";
+        $text .= "*Lapangan:* " . $lapangan->nama . "\n";
+        $text .= "*Main:* " . $start->translatedFormat('d F Y') . "\n";
+        $text .= "*Jam:* " . $start->format('H:i') . " - " . $end->format('H:i') . "\n";
+        $text .= "*Total:* Rp " . number_format($totalPrice, 0, ',', '.') . "\n";
         $text .= "──────────────────\n\n";
-        $text .= "Admin, silakan klik link di bawah untuk konfirmasi:\n\n";
-        $text .= "✅  *TERIMA PESANAN*\n" . $approveUrl . "\n\n";
-        $text .= "❌  *TOLAK PESANAN*\n" . $rejectUrl . "\n\n";
-        $text .= "⚠️ _Link ini otomatis mengubah status di sistem._";
 
         $whatsappUrl = "https://wa.me/{$nomorAdmin}?text=" . urlencode($text);
 

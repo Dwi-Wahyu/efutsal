@@ -2,7 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { pengajuanReservasi } from '@/routes';
-import { create } from '@/routes/reservasi';
+import { create } from '@/routes/lapangan';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import {
@@ -11,14 +11,13 @@ import {
     CheckCircle2,
     Clock,
     MapPin,
-    Plus,
     Ticket,
     XCircle,
 } from 'lucide-react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Riwayat Reservasi',
+        title: 'Pengajuan Reservasi',
         href: pengajuanReservasi().url,
     },
 ];
@@ -31,7 +30,7 @@ interface RiwayatItem {
     jam: string;
     total_harga: string;
     status: string; // pending, confirmed, cancelled, completed, expired
-    note: string | null;
+    note: string | null; // <--- PASTIKAN INI ADA
 }
 
 export default function RiwayatReservasi({
@@ -62,6 +61,7 @@ export default function RiwayatReservasi({
                 );
             case 'cancelled':
                 return (
+                    // PERBAIKAN: Tampilkan Alasan di bawah status Ditolak
                     <div className="flex flex-col items-end gap-1">
                         <div className="flex items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-1 text-red-600">
                             <XCircle className="h-4 w-4" />
@@ -70,7 +70,7 @@ export default function RiwayatReservasi({
                             </span>
                         </div>
                         {note && (
-                            <span className="max-w-[150px] text-right text-[10px] text-red-500">
+                            <span className="max-w-[150px] text-right text-[10px] text-red-500 italic">
                                 Alasan: {note}
                             </span>
                         )}
@@ -104,23 +104,11 @@ export default function RiwayatReservasi({
             <Head title="Riwayat Reservasi" />
 
             <div className="mx-auto max-w-4xl p-6">
-                <div className="mb-8 flex items-end justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">
-                            Tiket Saya
-                        </h1>
-                        <p className="mt-1 text-muted-foreground">
-                            Daftar semua jadwal main futsal kamu.
-                        </p>
-                    </div>
-                    <Button
-                        asChild
-                        className="hidden bg-primary hover:bg-primary/90 md:flex"
-                    >
-                        <Link href={create().url}>
-                            <Plus /> Booking Baru
-                        </Link>
-                    </Button>
+                <div className="mb-10 text-center">
+                    <h1 className="mb-2 text-3xl font-bold">Riwayat Tiket</h1>
+                    <p className="text-muted-foreground">
+                        Pantau status booking dan jadwal main futsalmu di sini.
+                    </p>
                 </div>
 
                 <div className="space-y-4">
@@ -182,14 +170,10 @@ export default function RiwayatReservasi({
                                             {item.total_harga}
                                         </p>
                                     </div>
-                                    <div className="flex w-full justify-end md:block">
+                                    <div className="flex hidden w-full justify-end md:block">
                                         {renderStatus(item.status, item.note)}
                                     </div>
                                 </div>
-
-                                {/* DEKORASI BULATAN TIKET */}
-                                <div className="absolute top-1/2 -left-3 hidden h-6 w-6 rounded-full border-r border-neutral-200 bg-background md:block dark:border-neutral-800" />
-                                <div className="absolute top-1/2 -right-3 hidden h-6 w-6 rounded-full border-l border-neutral-200 bg-background md:block dark:border-neutral-800" />
                             </div>
                         ))
                     ) : (

@@ -11,18 +11,32 @@ use Laravel\Fortify\Features;
 Route::get('/', function () {
     return Inertia::render('welcome', [
         'canRegister' => Features::enabled(Features::registration()),
-        // Ambil 6 lapangan untuk ditampilkan di landing page
-        'daftarLapangan' => Lapangan::take(6)->get(), 
+        'daftarLapangan' => Lapangan::take(6)->get(),
     ]);
 })->name('welcome');
 
 Route::get('/cari-lapangan', function () {
     return Inertia::render('cari-lapangan', [
-        'daftarLapangan' => Lapangan::all(), // Mengambil semua data lapangan
+        'daftarLapangan' => Lapangan::all(),
     ]);
 })->name('cari-lapangan');
 
+
+// ========================================================
+// 🔥 SHORTLINK UNTUK WA ADMIN (APPROVE / REJECT)
+// ========================================================
+Route::get('/a/{id}', function ($id) {
+    return redirect()->route('admin.reservasi.approve', $id);
+});
+
+Route::get('/r/{id}', function ($id) {
+    return redirect()->route('admin.reservasi.reject', $id);
+});
+// ========================================================
+
+
 Route::middleware(['auth', 'verified'])->group(function () {
+
     Route::get('dashboard', function () {
         return Inertia::render('dashboard');
     })->name('dashboard');
@@ -34,36 +48,29 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('reservasi', ReservasiController::class);
 
     Route::prefix('admin/reservasi')->name('admin_reservasi_')->group(function () {
-        Route::get('/', [ReservasiController::class, 'indexAdmin'])->name('index'); 
+        Route::get('/', [ReservasiController::class, 'indexAdmin'])->name('index');
     });
 
-    Route::get('lapangan/{lapangan}/reservasi',[ReservasiController::class, 'createFromLapangan'])
-     ->name('reservasi.create-from-lapangan');
+    Route::get('lapangan/{lapangan}/reservasi', [ReservasiController::class, 'createFromLapangan'])
+        ->name('reservasi.create-from-lapangan');
 
     Route::post('lapangan/{lapangan}/reservasi', [ReservasiController::class, 'storeFromLapangan'])
-     ->name('reservasi.store-from-lapangan');
+        ->name('reservasi.store-from-lapangan');
 
-    // Route::prefix('data-lapangan')->name('lapangan.')->group(function () {
-    //     Route::get('/', [LapanganController::class, 'index'])->name('index'); 
-    //     Route::get('/create', [LapanganController::class, 'create'])->name('create');
-    //     Route::get('{lapangan}', [LapanganController::class, 'show'])->name('show');    
-    //     Route::get('{lapangan}/edit', [LapanganController::class, 'edit'])->name('edit');    
-    //     Route::post('/', [LapanganController::class, 'store'])->name('store'); 
-    //     Route::put('{lapangan}', [LapanganController::class, 'update'])->name('update'); 
-    // });
 
     Route::prefix('admin/reservasi')->name('admin.reservasi.')->group(function () {
-        Route::get('/', [ReservasiController::class, 'indexAdmin'])->name('index'); 
-        
+
+        Route::get('/', [ReservasiController::class, 'indexAdmin'])->name('index');
+
+        // APPROVE
         Route::post('{reservasi}/approve', [ReservasiController::class, 'approve'])
             ->name('approve');
-            
-        // Ubah jadi POST/PUT agar bisa kirim alasan
+
+        // REJECT (POST agar bisa kirim alasan)
         Route::post('{reservasi}/reject', [ReservasiController::class, 'reject'])
             ->name('reject');
     });
 
-    
 
     Route::get('pengajuan-reservasi', function () {
         return Inertia::render('pengajuan-reservasi');
