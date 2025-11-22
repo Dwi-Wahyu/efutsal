@@ -43,6 +43,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     //     Route::put('{lapangan}', [LapanganController::class, 'update'])->name('update'); 
     // });
 
+Route::prefix('admin/reservasi')->name('admin.reservasi.')->group(function () {
+        // Konfirmasi Reservasi (Terima)
+        Route::get('{reservasi}/approve', [ReservasiController::class, 'approve'])
+            ->name('approve');
+            
+        // Tolak Reservasi (Form Alasan)
+        Route::get('{reservasi}/reject', [ReservasiController::class, 'reject'])
+            ->name('reject');
+    });
+
     Route::get('pengajuan-reservasi', function () {
         return Inertia::render('pengajuan-reservasi');
     })->name('pengajuan-reservasi');

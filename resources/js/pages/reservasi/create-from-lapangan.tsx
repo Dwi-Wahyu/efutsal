@@ -1,26 +1,25 @@
 import NavigationButton from '@/components/navigation-button';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import {
-    Field,
-    FieldContent,
-    FieldDescription,
-    FieldError,
-    FieldGroup,
-    FieldLabel,
-    FieldLegend,
-    FieldSet,
-} from '@/components/ui/field';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
-import formatPrice from '@/lib/format-price';
 import { home } from '@/routes';
 import { index as lapanganIndex, show } from '@/routes/lapangan';
 import { createFromLapangan, storeFromLapangan } from '@/routes/reservasi';
 import { BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
 import { format } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
+import {
+    Calendar,
+    Clock,
+    Info,
+    MapPin,
+    MessageCircle,
+    Users,
+    Wallet,
+} from 'lucide-react';
 import { FormEvent, useEffect, useState } from 'react';
 import { Lapangan } from '../lapangan';
 
@@ -32,7 +31,7 @@ const breadcrumbs = (lapangan: Lapangan): BreadcrumbItem[] => [
     { title: 'Home', href: home().url },
     { title: 'Lapangan', href: lapanganIndex().url },
     { title: lapangan.nama, href: show(lapangan).url },
-    { title: 'Reservasi', href: createFromLapangan(lapangan).url },
+    { title: 'Booking', href: createFromLapangan(lapangan).url },
 ];
 
 export default function ReservasiCreate({ lapangan }: Props) {
@@ -45,7 +44,15 @@ export default function ReservasiCreate({ lapangan }: Props) {
         end_time: '',
     });
 
-    // Hitung durasi & total harga setiap kali start_time atau end_time berubah
+    // Format Rupiah Helper
+    const formatRupiah = (amount: number) => {
+        return new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            minimumFractionDigits: 0,
+        }).format(amount);
+    };
+
     useEffect(() => {
         if (data.start_time && data.end_time) {
             const [startHour, startMinute] = data.start_time
@@ -59,7 +66,6 @@ export default function ReservasiCreate({ lapangan }: Props) {
             if (endMinutes > startMinutes) {
                 const hours = (endMinutes - startMinutes) / 60;
                 const price = hours * (lapangan.biaya_per_jam ?? 0);
-
                 setDurationHours(hours);
                 setTotalPrice(price);
             } else {
@@ -74,178 +80,220 @@ export default function ReservasiCreate({ lapangan }: Props) {
 
     const submit = (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        if (!data.date) return alert('Pilih tanggal terlebih dahulu');
+        if (!durationHours || !totalPrice)
+            return alert('Pastikan jam selesai lebih besar dari jam mulai');
 
-        if (!data.date) {
-            alert('Pilih tanggal terlebih dahulu');
-            return;
-        }
-        if (!durationHours || !totalPrice) {
-            alert('Pastikan jam selesai lebih besar dari jam mulai');
-            return;
-        }
-
-        post(storeFromLapangan(lapangan).url, {
-            preserveScroll: true,
-        });
+        post(storeFromLapangan(lapangan).url, { preserveScroll: true });
     };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs(lapangan)}>
-            <Head title={`Reservasi - ${lapangan.nama}`} />
+            <Head title={`Booking ${lapangan.nama}`} />
 
-            <div className="flex justify-center p-4">
-                <Card className="w-xl">
-                    <CardContent>
-                        <form onSubmit={submit}>
-                            <FieldSet>
-                                <FieldLegend>{lapangan.nama}</FieldLegend>
-                                <FieldDescription>
-                                    Rp {formatPrice(lapangan.biaya_per_jam)} /
-                                    jam
-                                </FieldDescription>
+            {/* --- HERO SECTION --- */}
+            <div className="relative h-[350px] w-full bg-neutral-900">
+                {lapangan.gambar ? (
+                    <img
+                        src={`/storage/${lapangan.gambar}`}
+                        alt={lapangan.nama}
+                        className="h-full w-full object-cover opacity-60"
+                    />
+                ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-neutral-800 text-neutral-500">
+                        <Info className="h-20 w-20 opacity-20" />
+                    </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
+                
+                <div className="absolute bottom-0 left-0 w-full p-6 md:p-10">
+                    <div className="mx-auto max-w-6xl">
+                        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                            <div>
+                                <span className="mb-2 inline-block rounded-full bg-primary/90 px-3 py-1 text-xs font-medium text-primary-foreground backdrop-blur-md">
+                                    Futsal Arena
+                                </span>
+                                <h1 className="text-3xl font-bold text-white md:text-5xl">
+                                    {lapangan.nama}
+                                </h1>
+                                <div className="mt-2 flex items-center gap-4 text-neutral-300">
+                                    <div className="flex items-center gap-1.5">
+                                        <MapPin className="h-4 w-4" />
+                                        <span className="text-sm">Lokasi Strategis</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <Users className="h-4 w-4" />
+                                        <span className="text-sm">Kapasitas {lapangan.kapasitas} Orang</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="mt-4 text-right md:mt-0">
+                                <p className="text-sm text-neutral-300">Mulai dari</p>
+                                <p className="text-3xl font-bold text-primary">
+                                    {formatRupiah(lapangan.biaya_per_jam)}
+                                    <span className="text-base font-normal text-white"> / jam</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                                <FieldGroup>
-                                    {/* TANGGAL */}
-                                    <Field orientation="vertical">
-                                        <FieldContent>
-                                            <FieldLabel>
-                                                Tanggal Sewa
-                                            </FieldLabel>
-                                            <FieldDescription>
-                                                Pilih tanggal yang ingin Anda
-                                                pesan
-                                            </FieldDescription>
-                                        </FieldContent>
+            {/* --- CONTENT SECTION --- */}
+            <div className="mx-auto max-w-6xl px-4 py-8 md:px-8">
+                <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+                    
+                    {/* KOLOM KIRI: INFO & RULES */}
+                    <div className="lg:col-span-2 space-y-6">
+                        <Card className="border-none shadow-none bg-transparent">
+                            <CardHeader className="px-0 pt-0">
+                                <CardTitle className="text-2xl">Fasilitas & Informasi</CardTitle>
+                            </CardHeader>
+                            <CardContent className="px-0 text-muted-foreground leading-relaxed">
+                                <p>
+                                    Nikmati pengalaman bermain futsal terbaik di <strong>{lapangan.nama}</strong>. 
+                                    Lapangan ini dirancang dengan standar profesional, lantai berkualitas tinggi, 
+                                    dan pencahayaan yang optimal untuk permainan siang maupun malam.
+                                </p>
+                                <ul className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <li className="flex items-center gap-2"><div className="h-2 w-2 rounded-full bg-green-500"/> Lantai Standar Internasional</li>
+                                    <li className="flex items-center gap-2"><div className="h-2 w-2 rounded-full bg-green-500"/> Ruang Ganti Bersih</li>
+                                    <li className="flex items-center gap-2"><div className="h-2 w-2 rounded-full bg-green-500"/> Area Parkir Luas</li>
+                                    <li className="flex items-center gap-2"><div className="h-2 w-2 rounded-full bg-green-500"/> CCTV Keamanan 24 Jam</li>
+                                </ul>
+                            </CardContent>
+                        </Card>
 
-                                        <div className="relative">
-                                            <Input
-                                                type="date"
-                                                value={data.date}
-                                                onChange={(e) =>
-                                                    setData(
-                                                        'date',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                min={format(
-                                                    new Date(),
-                                                    'yyyy-MM-dd',
-                                                )}
-                                                required
-                                            />
-                                            <CalendarIcon className="pointer-events-none absolute top-3 right-3 h-4 w-4 text-muted-foreground" />
+                        <Separator />
+
+                        <div className="rounded-xl bg-blue-50 p-6 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+                            <h3 className="flex items-center gap-2 font-semibold text-blue-700 dark:text-blue-300">
+                                <Info className="h-5 w-5" /> Aturan Pemesanan
+                            </h3>
+                            <ul className="mt-3 list-disc pl-5 text-sm text-blue-600/90 dark:text-blue-200/80 space-y-1">
+                                <li>Harap datang 15 menit sebelum jadwal main.</li>
+                                <li>Pembayaran dilakukan via transfer setelah konfirmasi WhatsApp.</li>
+                                <li>Pembatalan maksimal H-1 sebelum jadwal.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    {/* KOLOM KANAN: FORM BOOKING (Sticky) */}
+                    <div className="lg:col-span-1">
+                        <div className="sticky top-6">
+                            <Card className="overflow-hidden border shadow-lg rounded-xl">
+                                <div className="bg-neutral-900 p-4 text-white">
+                                    <h2 className="flex items-center gap-2 text-lg font-semibold">
+                                        <Calendar className="h-5 w-5" />
+                                        Jadwal Main
+                                    </h2>
+                                </div>
+                                
+                                <CardContent className="p-6">
+                                    <form onSubmit={submit} className="space-y-5">
+                                        
+                                        {/* Input Tanggal */}
+                                        <div className="space-y-2">
+                                            <Label>Pilih Tanggal</Label>
+                                            <div className="relative">
+                                                <Input
+                                                    type="date"
+                                                    className="pl-10"
+                                                    value={data.date}
+                                                    onChange={(e) => setData('date', e.target.value)}
+                                                    min={format(new Date(), 'yyyy-MM-dd')}
+                                                    required
+                                                />
+                                                <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                            </div>
+                                            {errors.date && <p className="text-xs text-red-500">{errors.date}</p>}
                                         </div>
-                                        {errors.date && (
-                                            <FieldError>
-                                                {errors.date}
-                                            </FieldError>
-                                        )}
-                                    </Field>
 
-                                    {/* JAM MULAI */}
-                                    <Field orientation="vertical">
-                                        <FieldContent>
-                                            <FieldLabel>Jam Mulai</FieldLabel>
-                                            <FieldDescription>
-                                                Contoh: 08:00
-                                            </FieldDescription>
-                                        </FieldContent>
-                                        <Input
-                                            type="time"
-                                            value={data.start_time}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'start_time',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            required
-                                        />
-                                        {errors.start_time && (
-                                            <FieldError>
-                                                {errors.start_time}
-                                            </FieldError>
-                                        )}
-                                    </Field>
-
-                                    {/* JAM SELESAI */}
-                                    <Field orientation="vertical">
-                                        <FieldContent>
-                                            <FieldLabel>Jam Selesai</FieldLabel>
-                                            <FieldDescription>
-                                                Contoh: 10:00
-                                            </FieldDescription>
-                                        </FieldContent>
-                                        <Input
-                                            type="time"
-                                            value={data.end_time}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'end_time',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            required
-                                        />
-                                        {errors.end_time && (
-                                            <FieldError>
-                                                {errors.end_time}
-                                            </FieldError>
-                                        )}
-                                    </Field>
-
-                                    {/* RINGKASAN HARGA (Tampil otomatis) */}
-                                    {durationHours !== null &&
-                                        totalPrice !== null && (
-                                            <div className="space-y-2 rounded-lg bg-muted/50 p-4">
-                                                <div className="flex justify-between text-sm">
-                                                    <span>Durasi</span>
-                                                    <span className="font-medium">
-                                                        {durationHours} jam
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between text-lg font-semibold">
-                                                    <span>Total Biaya</span>
-                                                    <span className="text-primary">
-                                                        Rp{' '}
-                                                        {totalPrice.toLocaleString(
-                                                            'id-ID',
-                                                        )}
-                                                    </span>
+                                        {/* Input Jam */}
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-2">
+                                                <Label>Mulai</Label>
+                                                <div className="relative">
+                                                    <Input
+                                                        type="time"
+                                                        value={data.start_time}
+                                                        onChange={(e) => setData('start_time', e.target.value)}
+                                                        required
+                                                        className="pl-9"
+                                                    />
+                                                    <Clock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                                                 </div>
                                             </div>
+                                            <div className="space-y-2">
+                                                <Label>Selesai</Label>
+                                                <div className="relative">
+                                                    <Input
+                                                        type="time"
+                                                        value={data.end_time}
+                                                        onChange={(e) => setData('end_time', e.target.value)}
+                                                        required
+                                                        className="pl-9"
+                                                    />
+                                                    <Clock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {(errors.start_time || errors.end_time) && (
+                                            <p className="text-xs text-red-500">Cek kembali jam mulai dan selesai</p>
                                         )}
 
-                                    {/* TOMBOL */}
-                                    <Field
-                                        orientation="responsive"
-                                        className="mt-6 flex justify-end gap-3"
-                                    >
-                                        <NavigationButton
-                                            href={lapanganIndex().url}
-                                        >
-                                            Batal
-                                        </NavigationButton>
-                                        <Button
-                                            type="submit"
-                                            disabled={
-                                                processing ||
-                                                totalPrice === null
-                                            }
-                                            className="min-w-40"
-                                        >
-                                            {processing
-                                                ? 'Mengajukan...'
-                                                : totalPrice === null
-                                                  ? 'Isi Jam Terlebih Dahulu'
-                                                  : `Ajukan Reservasi (Rp ${totalPrice.toLocaleString('id-ID')})`}
-                                        </Button>
-                                    </Field>
-                                </FieldGroup>
-                            </FieldSet>
-                        </form>
-                    </CardContent>
-                </Card>
+                                        <Separator />
+
+                                        {/* Kalkulasi Harga */}
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between text-sm text-muted-foreground">
+                                                <span>Harga Sewa</span>
+                                                <span>{formatRupiah(lapangan.biaya_per_jam)} x {durationHours || 0} jam</span>
+                                            </div>
+                                            
+                                            <div className="flex items-center justify-between rounded-lg bg-neutral-100 p-4 dark:bg-neutral-800">
+                                                <div className="flex items-center gap-2">
+                                                    <Wallet className="h-5 w-5 text-green-600" />
+                                                    <span className="font-semibold">Total</span>
+                                                </div>
+                                                <span className="text-xl font-bold text-green-600">
+                                                    {totalPrice ? formatRupiah(totalPrice) : '-'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Tombol Aksi */}
+                                        <div className="grid gap-3 pt-2">
+                                            <Button 
+                                                type="submit" 
+                                                size="lg" 
+                                                className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-bold shadow-md transition-all hover:-translate-y-0.5"
+                                                disabled={processing || totalPrice === null}
+                                            >
+                                                {processing ? (
+                                                    'Memproses...' 
+                                                ) : (
+                                                    <>
+                                                        <MessageCircle className="mr-2 h-5 w-5" />
+                                                        Booking via WhatsApp
+                                                    </>
+                                                )}
+                                            </Button>
+                                            
+                                            <NavigationButton 
+                                                href={lapanganIndex().url} 
+                                                variant="ghost" 
+                                                className="w-full"
+                                            >
+                                                Batal
+                                            </NavigationButton>
+                                        </div>
+                                    </form>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </div>
+                </div>
             </div>
         </AppLayout>
     );

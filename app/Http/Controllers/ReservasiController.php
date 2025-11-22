@@ -24,30 +24,19 @@ class ReservasiController extends Controller
 
     public function indexAdmin()
     {
-        // 1. Ambil data dengan relasi 'user' dan 'lapangan'
-        // 2. Gunakan get() untuk mengambil koleksi
-        // 3. Gunakan map() untuk memformat ulang data (cleaning data)
         $daftarReservasi = Reservasi::with(['user', 'lapangan'])
-            ->latest() // Mengurutkan dari yang terbaru
+            ->latest()
             ->get()
             ->map(function ($reservasi) {
                 return [
                     'id' => $reservasi->id,
-                    
-                    // Mengambil data dari Relasi
                     'user_name' => $reservasi->user->name ?? 'User Terhapus',
                     'lapangan_nama' => $reservasi->lapangan->nama ?? 'Lapangan Terhapus',
-                    
-                    // FORMAT TANGGAL & WAKTU (Carbon)
-                    // Karena sudah di-cast di Model, kita bisa langsung pakai method format()
-                    'tanggal_main' => $reservasi->date->format('d M Y'), // Contoh: 21 Nov 2025
-                    'jam_mulai'    => $reservasi->start_time->format('H:i'), // Contoh: 14:00
-                    'jam_selesai'  => $reservasi->end_time->format('H:i'),   // Contoh: 15:00
-                    
-                    // Format Rupiah sederhana
+                    'tanggal_main' => $reservasi->date->format('d M Y'),
+                    'jam_mulai'    => $reservasi->start_time->format('H:i'),
+                    'jam_selesai'  => $reservasi->end_time->format('H:i'),
                     'total_harga'  => 'Rp ' . number_format($reservasi->total_price, 0, ',', '.'),
-                    
-                    'status' => $reservasi->status, // Mengirim object Enum
+                    'status' => $reservasi->status,
                     'durasi' => $reservasi->duration_hours . ' Jam',
                 ];
             });
@@ -57,18 +46,11 @@ class ReservasiController extends Controller
         ]);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
     public function create()
     {   
         return Inertia::render('reservasi/create');
     }
 
-
-    /**
-     * Show the form for creating a new resource.
-     */
     public function createFromLapangan(Lapangan $lapangan)
     {   
         return Inertia::render('reservasi/create-from-lapangan', [
@@ -76,91 +58,117 @@ class ReservasiController extends Controller
         ]);
     }
 
-
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(StoreReservasiRequest $request)
     {
-
+        // Kosong, kita pakai storeFromLapangan
     }
 
     /**
-     * Store a newly created resource in storage.
+     * LOGIKA UTAMA: Simpan & Redirect ke WhatsApp dengan Link Aksi
      */
     public function storeFromLapangan(StoreReservasiRequest $request, Lapangan $lapangan, WhatsAppService $waService)
     {
-        // Ambil data yang sudah divalidasi
-        $date       = $request->validated('date');        // string: "2025-08-15"
-        $startTime  = $request->validated('start_time');  // string: "08:00"
-        $endTime    = $request->validated('end_time');    // string: "10:00"
+        $date       = $request->validated('date');
+        $startTime  = $request->validated('start_time');
+        $endTime    = $request->validated('end_time');
+        $user       = Auth::user();
 
-        // Gabungkan tanggal + jam → jadikan Carbon instance
         $start = Carbon::createFromFormat('Y-m-d H:i', "$date $startTime");
         $end   = Carbon::createFromFormat('Y-m-d H:i', "$date $endTime");
 
-        // Hitung durasi & total harga
         $durationHours = $start->diffInHours($end);
         $totalPrice    = $durationHours * $lapangan->biaya_per_jam;
 
-        // Simpan reservasi
-        Reservasi::create([
+        // 1. Simpan data
+        $reservasi = Reservasi::create([
             'lapangan_id'     => $lapangan->id,
-            'user_id'         => Auth::id(),
+            'user_id'         => $user->id,
             'date'            => $date,
-            'start_time'      => $start,           // otomatis jadi datetime
-            'end_time'        => $end,             // otomatis jadi datetime
+            'start_time'      => $start,
+            'end_time'        => $end,
             'duration_hours'  => $durationHours,
             'total_price'     => $totalPrice,
             'status'          => ReservasiStatus::Pending,
         ]);
 
-        $pesan = "Reservasi Baru Masuk";
+        // 2. Generate Link Aksi untuk Admin
+        // Link ini akan muncul di chat WA. Jika admin klik, status di DB berubah.
+        $approveLink = route('admin.reservasi.approve', $reservasi->id);
+        $rejectLink  = route('admin.reservasi.reject', $reservasi->id);
 
-        $waService->sendMessage('6289643144013', $pesan);
+        // 3. Format Pesan WhatsApp
+        $nomorAdmin = '6285342505228'; // Ganti dengan nomor admin asli
 
-        return redirect()
-            ->route('home')
-            ->with('success', 'Reservasi berhasil diajukan! Silakan lakukan pembayaran.');
+        $text  = "*PENGAJUAN BOOKING BARU #{$reservasi->id}*\n\n";
+        $text .= "Halo Admin, mohon proses pesanan ini:\n\n";
+        $text .= "👤 *Pemesan:* " . $user->name . "\n";
+        $text .= "🏟 *Lapangan:* " . $lapangan->nama . "\n";
+        $text .= "📅 *Jadwal:* " . $start->translatedFormat('d F Y') . ", " . $start->format('H:i') . "-" . $end->format('H:i') . "\n";
+        $text .= "💰 *Total:* Rp " . number_format($totalPrice, 0, ',', '.') . "\n\n";
+        
+        $text .= "👇 *AKSI ADMIN (KLIK LINK DI BAWAH)* 👇\n\n";
+        $text .= "✅ *TERIMA / KONFIRMASI:*\n";
+        $text .= $approveLink . "\n\n";
+        $text .= "❌ *TOLAK / BATALKAN:*\n";
+        $text .= $rejectLink . "\n\n";
+        
+        $text .= "------------------------------\n";
+        $text .= "Mohon infokan nomor rekening jika diterima.";
+
+        $encodedMessage = urlencode($text);
+        $whatsappUrl = "https://wa.me/{$nomorAdmin}?text={$encodedMessage}";
+
+        return Inertia::location($whatsappUrl);
     }
 
-    public function formatNomor($nomor) {
-        if (substr($nomor, 0, 1) == '0') {
-            return '62' . substr($nomor, 1);
-        }
-        return $nomor;
-    }
-    
     /**
-     * Display the specified resource.
+     * AKSI ADMIN: Terima Pesanan (Via Link WA)
      */
+    public function approve(Reservasi $reservasi)
+    {
+        // Validasi: Hanya admin yang boleh akses (opsional, bisa tambah middleware)
+        if (!Auth::user()->is_admin) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $reservasi->update(['status' => ReservasiStatus::Confirmed]);
+
+        return redirect()->route('admin_reservasi_index')
+            ->with('success', "Reservasi #{$reservasi->id} berhasil DITERIMA ✅");
+    }
+
+    /**
+     * AKSI ADMIN: Tolak Pesanan (Via Link WA)
+     */
+    public function reject(Reservasi $reservasi)
+    {
+        if (!Auth::user()->is_admin) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $reservasi->update(['status' => ReservasiStatus::Cancelled]);
+
+        return redirect()->route('admin_reservasi_index')
+            ->with('success', "Reservasi #{$reservasi->id} berhasil DITOLAK ❌");
+    }
+
     public function show(Reservasi $reservasi)
     {
         return Inertia::render('reservasi/show', [ 
-            // Data Lapangan dikirim sebagai 'reservasi'
             'reservasi' => $reservasi, 
         ]);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
     public function edit(Reservasi $reservasi)
     {
         //
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(UpdateReservasiRequest $request, Reservasi $reservasi)
     {
         //
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Reservasi $reservasi)
     {
         //
