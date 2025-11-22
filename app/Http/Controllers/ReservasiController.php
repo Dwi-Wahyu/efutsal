@@ -101,15 +101,15 @@ class ReservasiController extends Controller
 
         $text  = "*PENGAJUAN BOOKING BARU #{$reservasi->id}*\n\n";
         $text .= "Halo Admin, mohon proses pesanan ini:\n\n";
-        $text .= "👤 *Pemesan:* " . $user->name . "\n";
-        $text .= "🏟 *Lapangan:* " . $lapangan->nama . "\n";
-        $text .= "📅 *Jadwal:* " . $start->translatedFormat('d F Y') . ", " . $start->format('H:i') . "-" . $end->format('H:i') . "\n";
-        $text .= "💰 *Total:* Rp " . number_format($totalPrice, 0, ',', '.') . "\n\n";
+        $text .= "*Pemesan:* " . $user->name . "\n";
+        $text .= "*Lapangan:* " . $lapangan->nama . "\n";
+        $text .= "*Jadwal:* " . $start->translatedFormat('d F Y') . ", " . $start->format('H:i') . "-" . $end->format('H:i') . "\n";
+        $text .= "*Total:* Rp " . number_format($totalPrice, 0, ',', '.') . "\n\n";
         
-        $text .= "👇 *AKSI ADMIN (KLIK LINK DI BAWAH)* 👇\n\n";
-        $text .= "✅ *TERIMA / KONFIRMASI:*\n";
+        $text .= "*AKSI ADMIN (KLIK LINK DI BAWAH)* 👇\n\n";
+        $text .= "*TERIMA / KONFIRMASI:*\n";
         $text .= $approveLink . "\n\n";
-        $text .= "❌ *TOLAK / BATALKAN:*\n";
+        $text .= "*TOLAK / BATALKAN:*\n";
         $text .= $rejectLink . "\n\n";
         
         $text .= "------------------------------\n";
