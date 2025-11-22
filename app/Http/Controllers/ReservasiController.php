@@ -5,23 +5,58 @@ namespace App\Http\Controllers;
 use App\Enums\ReservasiStatus;
 use App\Models\Reservasi;
 use App\Http\Requests\StoreReservasiRequest;
-use App\Http\Requests\UpdateReservasiRequest;
 use App\Models\Lapangan;
 use Carbon\Carbon;
 use App\Services\WhatsAppService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class ReservasiController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Menampilkan Riwayat Reservasi User
      */
     public function index()
     {
-        return Inertia::render('reservasi/index');
+        $user = Auth::user();
+
+        $riwayatReservasi = Reservasi::with('lapangan')
+            ->where('user_id', $user->id)
+            ->latest()
+            ->get()
+            ->map(function ($item) {
+                $sekarang = Carbon::now();
+                $isExpired = $sekarang->greaterThan($item->end_time);
+                
+                $displayStatus = $item->status->value;
+                
+                if ($isExpired && $item->status === ReservasiStatus::Confirmed) {
+                    $displayStatus = 'completed';
+                } elseif ($isExpired && $item->status === ReservasiStatus::Pending) {
+                    $displayStatus = 'expired';
+                }
+
+                return [
+                    'id' => $item->id,
+                    'lapangan_nama' => $item->lapangan->nama,
+                    'lapangan_gambar' => $item->lapangan->gambar,
+                    'tanggal' => $item->date->translatedFormat('l, d F Y'), 
+                    'jam' => $item->start_time->format('H:i') . ' - ' . $item->end_time->format('H:i'),
+                    'total_harga' => 'Rp ' . number_format($item->total_price, 0, ',', '.'),
+                    'status' => $displayStatus, 
+                    'note' => $item->note, 
+                ];
+            });
+
+        return Inertia::render('reservasi/index', [
+            'riwayatReservasi' => $riwayatReservasi
+        ]);
     }
 
+    /**
+     * Dashboard Admin: Menampilkan Daftar Pengajuan
+     */
     public function indexAdmin()
     {
         $daftarReservasi = Reservasi::with(['user', 'lapangan'])
@@ -32,12 +67,16 @@ class ReservasiController extends Controller
                     'id' => $reservasi->id,
                     'user_name' => $reservasi->user->name ?? 'User Terhapus',
                     'lapangan_nama' => $reservasi->lapangan->nama ?? 'Lapangan Terhapus',
-                    'tanggal_main' => $reservasi->date->format('d M Y'),
-                    'jam_mulai'    => $reservasi->start_time->format('H:i'),
-                    'jam_selesai'  => $reservasi->end_time->format('H:i'),
+                    
+                    // PERBAIKAN 1: Format tanggal & jam agar tampil di tabel admin
+                    'tanggal_main' => $reservasi->date->translatedFormat('d M Y'),
+                    // Gabungkan jam mulai & selesai jadi satu string 'jam'
+                    'jam' => $reservasi->start_time->format('H:i') . ' - ' . $reservasi->end_time->format('H:i'),
+                    
                     'total_harga'  => 'Rp ' . number_format($reservasi->total_price, 0, ',', '.'),
                     'status' => $reservasi->status,
                     'durasi' => $reservasi->duration_hours . ' Jam',
+                    'note' => $reservasi->note,
                 ];
             });
 
@@ -48,7 +87,11 @@ class ReservasiController extends Controller
 
     public function create()
     {   
-        return Inertia::render('reservasi/create');
+        $daftarLapangan = Lapangan::all();
+
+        return Inertia::render('reservasi/create', [
+            'daftarLapangan' => $daftarLapangan,
+        ]);
     }
 
     public function createFromLapangan(Lapangan $lapangan)
@@ -58,13 +101,90 @@ class ReservasiController extends Controller
         ]);
     }
 
-    public function store(StoreReservasiRequest $request)
+    /**
+     * Simpan dari Form Generic (Pilih Lapangan Sendiri)
+     */
+    public function store(Request $request)
     {
-        // Kosong, kita pakai storeFromLapangan
+        // Validasi Input
+        $validated = $request->validate([
+            'lapangan_id' => 'required|exists:lapangan,id',
+            'date'        => 'required|date|after_or_equal:today',
+            'start_time'  => 'required|date_format:H:i',
+            'end_time'    => 'required|date_format:H:i|after:start_time',
+        ]);
+
+        $user = Auth::user();
+        $lapangan = Lapangan::findOrFail($validated['lapangan_id']);
+
+        // Buat objek Carbon untuk waktu mulai dan selesai
+        $start = Carbon::createFromFormat('Y-m-d H:i', "{$validated['date']} {$validated['start_time']}");
+        $end   = Carbon::createFromFormat('Y-m-d H:i', "{$validated['date']} {$validated['end_time']}");
+
+        // --- PERBAIKAN 2: Cek Bentrok Jadwal (Hanya jika status Confirmed) ---
+        $isBooked = Reservasi::where('lapangan_id', $lapangan->id)
+            ->where('status', ReservasiStatus::Confirmed) // Hanya cek yang sudah disetujui admin
+            ->where(function ($query) use ($start, $end) {
+                // Logika overlap: 
+                // Jadwal baru mulai sebelum jadwal lama selesai DAN jadwal baru selesai setelah jadwal lama mulai
+                $query->where('start_time', '<', $end)
+                      ->where('end_time', '>', $start);
+            })
+            ->exists();
+
+        if ($isBooked) {
+            // Kembalikan error ke frontend agar muncul di form
+            return back()->withErrors([
+                'start_time' => 'Maaf, jadwal pada jam tersebut sudah penuh (Disetujui Admin). Silakan pilih jam atau lapangan lain.',
+            ]);
+        }
+        // --------------------------------------------------------------------
+
+        $durationHours = $start->diffInHours($end);
+        $totalPrice    = $durationHours * $lapangan->biaya_per_jam;
+
+        $reservasi = Reservasi::create([
+            'lapangan_id'     => $lapangan->id,
+            'user_id'         => $user->id,
+            'date'            => $validated['date'],
+            'start_time'      => $start,
+            'end_time'        => $end,
+            'duration_hours'  => $durationHours,
+            'total_price'     => $totalPrice,
+            'status'          => ReservasiStatus::Pending,
+        ]);
+
+        // Logika WhatsApp
+        $approveUrl = route('admin.reservasi.approve', $reservasi->id);
+        $rejectUrl  = route('admin.reservasi.reject', $reservasi->id);
+        $nomorAdmin = '6289643144013'; 
+
+        $text  = "📢 *ORDER BARU MASUK #{$reservasi->id}*\n";
+        $text .= "──────────────────\n";
+        $text .= "👤 *Pemesan:* " . $user->name . "\n";
+        $text .= "🏟 *Lapangan:* " . $lapangan->nama . "\n";
+        $text .= "📅 *Main:* " . $start->translatedFormat('d F Y') . "\n";
+        $text .= "⏰ *Jam:* " . $start->format('H:i') . " - " . $end->format('H:i') . "\n";
+        $text .= "💰 *Total:* Rp " . number_format($totalPrice, 0, ',', '.') . "\n";
+        $text .= "──────────────────\n\n";
+        
+        $text .= "Admin, silakan klik link di bawah untuk konfirmasi:\n\n";
+        $text .= "✅  *TERIMA PESANAN*\n";
+        $text .= $approveUrl . "\n\n";
+        $text .= "❌  *TOLAK PESANAN*\n";
+        $text .= $rejectUrl . "\n\n";
+        $text .= "⚠️ _Link ini otomatis mengubah status di sistem._";
+
+        $whatsappUrl = "https://wa.me/{$nomorAdmin}?text=" . urlencode($text);
+
+        return Inertia::location($whatsappUrl);
     }
 
     /**
-     * LOGIKA UTAMA: Simpan & Redirect ke WhatsApp dengan Link Aksi
+     * Simpan dari Halaman Detail Lapangan
+     */
+    /**
+     * LOGIKA UTAMA: Store dari Halaman Detail Lapangan
      */
     public function storeFromLapangan(StoreReservasiRequest $request, Lapangan $lapangan, WhatsAppService $waService)
     {
@@ -76,10 +196,32 @@ class ReservasiController extends Controller
         $start = Carbon::createFromFormat('Y-m-d H:i', "$date $startTime");
         $end   = Carbon::createFromFormat('Y-m-d H:i', "$date $endTime");
 
+        // --------------------------------------------------------------------
+        // CEK JADWAL BENTROK (Anti Double Booking)
+        // --------------------------------------------------------------------
+        $isBooked = Reservasi::where('lapangan_id', $lapangan->id)
+            ->where('status', ReservasiStatus::Confirmed) // Hanya cek yang sudah DISETUJUI Admin
+            ->where(function ($query) use ($start, $end) {
+                // Logika Tabrakan Waktu:
+                // Jadwal baru (Start) < Jadwal lama (End)  DAN  Jadwal baru (End) > Jadwal lama (Start)
+                $query->where('start_time', '<', $end)
+                      ->where('end_time', '>', $start);
+            })
+            ->exists();
+
+        // Jika sudah ada yang booking & status confirmed:
+        if ($isBooked) {
+            // Kembalikan error ke frontend (Inertia akan menangkap ini di props.errors)
+            return back()->withErrors([
+                'start_time' => 'GAGAL: Lapangan sudah dibooking orang lain di jam ini (Disetujui Admin).',
+            ]);
+        }
+        // --------------------------------------------------------------------
+
         $durationHours = $start->diffInHours($end);
         $totalPrice    = $durationHours * $lapangan->biaya_per_jam;
 
-        // 1. Simpan data
+        // Simpan Data (Status Pending)
         $reservasi = Reservasi::create([
             'lapangan_id'     => $lapangan->id,
             'user_id'         => $user->id,
@@ -91,65 +233,77 @@ class ReservasiController extends Controller
             'status'          => ReservasiStatus::Pending,
         ]);
 
-        // 2. Generate Link Aksi untuk Admin
-        // Link ini akan muncul di chat WA. Jika admin klik, status di DB berubah.
-        $approveLink = route('admin.reservasi.approve', $reservasi->id);
-        $rejectLink  = route('admin.reservasi.reject', $reservasi->id);
+        // Logika WhatsApp (Sama seperti sebelumnya)
+        $approveUrl = route('admin.reservasi.approve', $reservasi->id);
+        $rejectUrl  = route('admin.reservasi.reject', $reservasi->id);
+        $nomorAdmin = '6289643144013'; 
 
-        // 3. Format Pesan WhatsApp
-        $nomorAdmin = '6285342505228'; // Ganti dengan nomor admin asli
+        $text  = "📢 *ORDER BARU MASUK #{$reservasi->id}*\n";
+        $text .= "──────────────────\n";
+        $text .= "👤 *Pemesan:* " . $user->name . "\n";
+        $text .= "🏟 *Lapangan:* " . $lapangan->nama . "\n";
+        $text .= "📅 *Main:* " . $start->translatedFormat('d F Y') . "\n";
+        $text .= "⏰ *Jam:* " . $start->format('H:i') . " - " . $end->format('H:i') . "\n";
+        $text .= "💰 *Total:* Rp " . number_format($totalPrice, 0, ',', '.') . "\n";
+        $text .= "──────────────────\n\n";
+        $text .= "Admin, silakan klik link di bawah untuk konfirmasi:\n\n";
+        $text .= "✅  *TERIMA PESANAN*\n" . $approveUrl . "\n\n";
+        $text .= "❌  *TOLAK PESANAN*\n" . $rejectUrl . "\n\n";
+        $text .= "⚠️ _Link ini otomatis mengubah status di sistem._";
 
-        $text  = "*PENGAJUAN BOOKING BARU #{$reservasi->id}*\n\n";
-        $text .= "Halo Admin, mohon proses pesanan ini:\n\n";
-        $text .= "*Pemesan:* " . $user->name . "\n";
-        $text .= "*Lapangan:* " . $lapangan->nama . "\n";
-        $text .= "*Jadwal:* " . $start->translatedFormat('d F Y') . ", " . $start->format('H:i') . "-" . $end->format('H:i') . "\n";
-        $text .= "*Total:* Rp " . number_format($totalPrice, 0, ',', '.') . "\n\n";
-        
-        $text .= "*AKSI ADMIN (KLIK LINK DI BAWAH)* 👇\n\n";
-        $text .= "*TERIMA / KONFIRMASI:*\n";
-        $text .= $approveLink . "\n\n";
-        $text .= "*TOLAK / BATALKAN:*\n";
-        $text .= $rejectLink . "\n\n";
-        
-        $text .= "------------------------------\n";
-        $text .= "Mohon infokan nomor rekening jika diterima.";
-
-        $encodedMessage = urlencode($text);
-        $whatsappUrl = "https://wa.me/{$nomorAdmin}?text={$encodedMessage}";
+        $whatsappUrl = "https://wa.me/{$nomorAdmin}?text=" . urlencode($text);
 
         return Inertia::location($whatsappUrl);
     }
 
-    /**
-     * AKSI ADMIN: Terima Pesanan (Via Link WA)
-     */
+    // --- AKSI ADMIN ---
+
     public function approve(Reservasi $reservasi)
     {
-        // Validasi: Hanya admin yang boleh akses (opsional, bisa tambah middleware)
-        if (!Auth::user()->is_admin) {
-            abort(403, 'Unauthorized action.');
+        if (!Auth::check() || !Auth::user()->is_admin) {
+            return redirect()->route('login')->with('status', 'Silakan login sebagai Admin untuk memproses.');
+        }
+
+        // (Opsional) Cek lagi di sini apakah jadwal masih kosong sebelum approve
+        // untuk menghindari balapan (race condition) jika admin telat klik
+        $isBooked = Reservasi::where('lapangan_id', $reservasi->lapangan_id)
+            ->where('status', ReservasiStatus::Confirmed)
+            ->where('id', '!=', $reservasi->id) // Jangan cek diri sendiri
+            ->where(function ($query) use ($reservasi) {
+                $query->where('start_time', '<', $reservasi->end_time)
+                      ->where('end_time', '>', $reservasi->start_time);
+            })
+            ->exists();
+
+        if ($isBooked) {
+            return redirect()->route('admin.reservasi.index')
+                ->with('error', 'Gagal Terima! Sudah ada jadwal lain yang Confirmed di jam ini.');
         }
 
         $reservasi->update(['status' => ReservasiStatus::Confirmed]);
 
-        return redirect()->route('admin_reservasi_index')
-            ->with('success', "Reservasi #{$reservasi->id} berhasil DITERIMA ✅");
+        return redirect()->route('admin.reservasi.index')
+            ->with('success', "Mantap! Reservasi #{$reservasi->id} sudah disetujui. ✅");
     }
 
-    /**
-     * AKSI ADMIN: Tolak Pesanan (Via Link WA)
-     */
-    public function reject(Reservasi $reservasi)
+    public function reject(Request $request, Reservasi $reservasi)
     {
-        if (!Auth::user()->is_admin) {
-            abort(403, 'Unauthorized action.');
+        if (!Auth::check() || !Auth::user()->is_admin) {
+            return redirect()->route('login')->with('status', 'Silakan login sebagai Admin untuk memproses.');
         }
 
-        $reservasi->update(['status' => ReservasiStatus::Cancelled]);
+        // Validasi input alasan dari modal
+        $request->validate([
+            'reason' => 'nullable|string|max:255'
+        ]);
 
-        return redirect()->route('admin_reservasi_index')
-            ->with('success', "Reservasi #{$reservasi->id} berhasil DITOLAK ❌");
+        $reservasi->update([
+            'status' => ReservasiStatus::Cancelled,
+            'note'   => $request->input('reason') ?? 'Ditolak Admin'
+        ]);
+
+        return redirect()->route('admin.reservasi.index')
+            ->with('success', "Oke, Reservasi #{$reservasi->id} telah ditolak. ❌");
     }
 
     public function show(Reservasi $reservasi)
@@ -159,18 +313,27 @@ class ReservasiController extends Controller
         ]);
     }
 
-    public function edit(Reservasi $reservasi)
+   /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit() // Hapus parameter ($reservasi)
     {
-        //
+        // Kosong karena belum ada fitur edit
     }
 
-    public function update(UpdateReservasiRequest $request, Reservasi $reservasi)
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update() // Hapus parameter ($request, $reservasi)
     {
-        //
+        // Kosong karena belum ada fitur update
     }
 
-    public function destroy(Reservasi $reservasi)
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy() // Hapus parameter ($reservasi)
     {
-        //
+        // Kosong karena belum ada fitur delete
     }
 }

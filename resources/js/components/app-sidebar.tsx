@@ -8,14 +8,11 @@ import {
     SidebarMenu,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import {
-    admin_reservasi_index,
-    dashboard,
-    home,
-    pengajuanReservasi,
-} from '@/routes';
+import { dashboard, home } from '@/routes';
 import { index } from '@/routes/lapangan';
 
+import { index as adminReservasiIndex } from '@/routes/admin/reservasi';
+import { index as userReservasiIndex } from '@/routes/reservasi';
 import { type NavItem } from '@/types';
 import { usePage } from '@inertiajs/react';
 import { Home, LayoutGrid, Mails, Volleyball } from 'lucide-react';
@@ -34,7 +31,7 @@ const adminNavItems: NavItem[] = [
     },
     {
         title: 'Pengajuan Reservasi',
-        href: admin_reservasi_index(),
+        href: adminReservasiIndex(),
         icon: Mails,
     },
 ];
@@ -47,7 +44,7 @@ const userNavItems: NavItem[] = [
     },
     {
         title: 'Pengajuan Reservasi',
-        href: pengajuanReservasi(),
+        href: userReservasiIndex(),
         icon: Mails,
     },
 ];

@@ -3,6 +3,7 @@
 use App\Http\Controllers\LapanganController;
 use App\Http\Controllers\ReservasiController;
 use App\Http\Controllers\UserController;
+use App\Models\Lapangan;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -10,8 +11,16 @@ use Laravel\Fortify\Features;
 Route::get('/', function () {
     return Inertia::render('welcome', [
         'canRegister' => Features::enabled(Features::registration()),
+        // Ambil 6 lapangan untuk ditampilkan di landing page
+        'daftarLapangan' => Lapangan::take(6)->get(), 
     ]);
 })->name('welcome');
+
+Route::get('/cari-lapangan', function () {
+    return Inertia::render('cari-lapangan', [
+        'daftarLapangan' => Lapangan::all(), // Mengambil semua data lapangan
+    ]);
+})->name('cari-lapangan');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
@@ -43,15 +52,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     //     Route::put('{lapangan}', [LapanganController::class, 'update'])->name('update'); 
     // });
 
-Route::prefix('admin/reservasi')->name('admin.reservasi.')->group(function () {
-        // Konfirmasi Reservasi (Terima)
-        Route::get('{reservasi}/approve', [ReservasiController::class, 'approve'])
+    Route::prefix('admin/reservasi')->name('admin.reservasi.')->group(function () {
+        Route::get('/', [ReservasiController::class, 'indexAdmin'])->name('index'); 
+        
+        Route::post('{reservasi}/approve', [ReservasiController::class, 'approve'])
             ->name('approve');
             
-        // Tolak Reservasi (Form Alasan)
-        Route::get('{reservasi}/reject', [ReservasiController::class, 'reject'])
+        // Ubah jadi POST/PUT agar bisa kirim alasan
+        Route::post('{reservasi}/reject', [ReservasiController::class, 'reject'])
             ->name('reject');
     });
+
+    
 
     Route::get('pengajuan-reservasi', function () {
         return Inertia::render('pengajuan-reservasi');
